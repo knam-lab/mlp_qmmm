@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlp_qmmm"
+version = "0.2.0"
+description = "Long-range MLP QM/MM framework"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{name = "Abdul Raafik Arattu Thodika", email = "atrafikvnr@gmail.com"},
+           {name = "Xiaoliang Pan", email = "panxl@panxl.net"}]
+requires-python = ">=3.9"
+dependencies = [
+  "numpy>=1.23",
+  "pyyaml>=6.0",
+  "matplotlib>=3.7",
+  "pandas>=2.0",
+  # PyTorch: let users install a CUDA-matched wheel themselves.
+  # If you want CPU-only by default, you can add "torch>=2.1; extra == 'cpu'" under [project.optional-dependencies].
+]
+
+[project.scripts]
+qmmm-train = "mlp_qmmm.b_training:main"
+qmmm-test  = "mlp_qmmm.c_testing:main"
+qmmm-dpmm-charmm  = "mlp_qmmm.d_dpmmincharmm:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mlp_qmmm*"]
