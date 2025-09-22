@@ -28,8 +28,19 @@ pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f ht
 cd <package_base_dir>
 pip install -e .
 ```
-
 ---
+## 🚀 Quick Start
+### 1. How to Train
+Prepare a YAML config file (e.g., `config.yaml`) with the desired settings.
+Then run the training script:
+```bash
+qmmm-train config.yaml
+```
+### 2. How to Asess Performance
+After training, evaluate the model using:
+```bash
+qmmm-test <saved_dir>
+```
 
 ## ✨ Authors
 

@@ -42,6 +42,7 @@ adapter_kwargs:
   verbose: true
   progress_every: 5
 
+
 # -------------------------
 # Species (QM region types)
 # All frames should currently have same QM atom count/order (to match channels).
