@@ -10,14 +10,14 @@ Implements descriptor + electrostatic feature networks, flexible training via YA
 Clone the repository and install into your environment:
 
 ```bash
-#conda setup
-source /usr/local/miniforge3/activate_conda_env.sh
-conda create -n  sarojmlpenv
-conda activate sarojmlpenv
-conda install conda-forge::mamba
-mamba install -c conda-forge ipython numpy scipy matplotlib mdanalysis multiprocess tqdm pandas pyyaml
+#Conda Environment
+conda create -n  mlpqmmmenv python # ==3.13
+conda activate mlpqmmmenv
+#conda install conda-forge::mamba
+#mamba install -c conda-forge ipython numpy scipy matplotlib mdanalysis multiprocess tqdm pandas pyyaml
+pip ipython numpy scipy matplotlib mdanalysis multiprocess tqdm pandas pyyaml setuptools
 
-# pip install torch # based on the cuda in the ,achine working with
+# pip install torch # based on the cuda in the machine you are working with
 # For CUDA 12
 pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 
@@ -25,7 +25,7 @@ pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu12
 pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
 # or try # pip install torch torchvision torchaudio
 
-cd <package_dir>
+cd <package_base_dir>
 pip install -e .
 ```
 
