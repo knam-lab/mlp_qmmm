@@ -15,7 +15,7 @@ conda create -n  mlpqmmmenv python # ==3.13
 conda activate mlpqmmmenv
 #conda install conda-forge::mamba
 #mamba install -c conda-forge ipython numpy scipy matplotlib mdanalysis multiprocess tqdm pandas pyyaml
-pip ipython numpy scipy matplotlib mdanalysis multiprocess tqdm pandas pyyaml setuptools
+pip install ipython numpy scipy matplotlib mdanalysis multiprocess tqdm pandas pyyaml setuptools
 
 # pip install torch # based on the cuda in the machine you are working with
 # For CUDA 12
