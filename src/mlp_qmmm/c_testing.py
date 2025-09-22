@@ -2,7 +2,7 @@
 # c_testing.py  — UTF-8 safe, CSV-safe, headless-friendly
 from __future__ import annotations
 
-import argparse, json, os, math, csv, random
+import argparse, json, os, math, csv, random, time
 from typing import Dict, Any, List, Tuple
 
 import numpy as np
@@ -36,7 +36,6 @@ def to_tensor(x: np.ndarray, device: torch.device) -> torch.Tensor:
     return t.to(device)
 
 def _csv_safe_cell(x: Any) -> str:
-    """Best-effort string for CSV that won't raise on non-ASCII / bytes."""
     if x is None:
         return ""
     if isinstance(x, bytes):
@@ -58,7 +57,6 @@ def masked_mae_rmse_r2(pred: np.ndarray, true: np.ndarray, mask: np.ndarray | No
     diff = pred - true
     mae = float(np.mean(np.abs(diff)))
     rmse = float(np.sqrt(np.mean(diff ** 2)))
-    # R^2 (coefficient of determination)
     ss_res = float(np.sum(diff ** 2))
     mean_true = float(np.mean(true)) if true.size else 0.0
     ss_tot = float(np.sum((true - mean_true) ** 2))
@@ -82,7 +80,7 @@ def normalize_shapes_np(pred: np.ndarray, targ: np.ndarray) -> tuple[np.ndarray,
 
 
 # --------- unit conversion helpers ---------
-EV_TO_KCALMOL = 23.060547830619  # 1 eV = 23.06055 kcal/mol
+EV_TO_KCALMOL = 23.060547830619
 
 def _looks_like_energy(name: str) -> bool:
     n = name.lower()
@@ -97,17 +95,10 @@ def _looks_like_esp(name: str) -> bool:
     return (n.endswith("_esp") or "esp" == n or "espgrad" in n)
 
 def convert_units(name: str, arr: np.ndarray, units: str) -> Tuple[np.ndarray, str]:
-    """
-    Convert eV-based arrays to kcal/mol-based units when requested.
-    - Energy-like: eV -> kcal/mol
-    - Gradient-like (per distance): eV/Å -> kcal/mol/Å
-    - ESP (per charge): eV/Å/e -> kcal/mol/Å/e
-    """
     if units.lower() == "ev":
         if _looks_like_energy(name):
             return arr, "eV"
         if _looks_like_grad(name):
-            # mm_espgrad_* are also "grad-like" but per charge; label below
             if _looks_like_esp(name):
                 return arr, "eV/Å/e"
             return arr, "eV/Å"
@@ -125,16 +116,10 @@ def convert_units(name: str, arr: np.ndarray, units: str) -> Tuple[np.ndarray, s
 # --------- vector flattening ---------
 def flatten_vec(pred: np.ndarray, true: np.ndarray, mask: np.ndarray | None, mode: str
                 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray | None]:
-    """
-    mode='magnitude'  : use vector magnitudes (non-negative)
-    mode='component'  : flatten all components (signed)
-    """
-    # Vector fields (B,N,3)
     if pred.ndim == 3 and pred.shape[-1] == 3:
         m = None
         if mask is not None:
             m = mask.astype(bool)
-            # If mask is vector-like, reduce it to (B,N)
             if m.ndim == pred.ndim:
                 if m.shape[-1] == 3:
                     m = m[..., 0]
@@ -156,12 +141,10 @@ def flatten_vec(pred: np.ndarray, true: np.ndarray, mask: np.ndarray | None, mod
             return p, t, None
         else:
             raise ValueError(f"Unknown vector_mode '{mode}'")
-    # (B,N) or (B,)
     if pred.ndim == 2:
         return pred.reshape(-1), true.reshape(-1), (mask.reshape(-1) if mask is not None else None)
     if pred.ndim == 1:
         return pred, true, mask
-    # fallback
     return pred.reshape(-1), true.reshape(-1), (mask.reshape(-1) if mask is not None else None)
 
 
@@ -211,6 +194,7 @@ def main():
     input_keys: List[str] = io_meta["input_keys"]
     loss_keys: List[str] = io_meta["loss_keys"]
     masks_cfg: Dict[str, str] = io_meta.get("masks", {})
+    species_cfg: List[int] | None = io_meta.get("species", None)
     device = torch.device(args.device)
 
     # ---- debug dataset summary
@@ -265,7 +249,7 @@ def main():
 
     # ---- inference ----
     preds = {k: [] for k in loss_keys}
-    with torch.set_grad_enabled(True):  # TorchScript forward often needs no grad, but safe here
+    with torch.set_grad_enabled(True):
         bs = max(1, int(args.batch_size))
         first_out = None
         for i0 in range(0, B, bs):
@@ -293,38 +277,28 @@ def main():
             continue
         preds_np[k] = torch.cat(blocks, dim=0).cpu().numpy()
 
-    # ========= NEW: derive mm_grad_* from mm_espgrad_* using mm_Q =========
-    # We will create additional keys like:
-    #   mm_espgrad_d   -> mm_grad_d
-    #   mm_espgrad_low -> mm_grad_low
-    #   mm_espgrad_high-> mm_grad_high
-    derived_pairs: List[Tuple[str, str]] = []  # (src_esp_key, new_grad_key)
-
+    # ========= derive mm_grad_* from mm_espgrad_* using mm_Q (unchanged) =========
+    derived_pairs: List[Tuple[str, str]] = []
     def _esp_to_grad_name(src: str) -> str:
-        # robust but simple: replace the first "espgrad" occurrence
         return src.replace("espgrad", "grad", 1)
 
     if "mm_Q" in test_data:
-        Q = test_data["mm_Q"]  # shape (B, Mmax)
+        Q = test_data["mm_Q"]
         if Q.ndim != 2:
             print("[warn] test_data['mm_Q'] must be 2-D (B,Mmax); skipping mm_grad derivations")
         else:
             for src in sorted(preds_np.keys()):
-                # only for MM ESP grads, and only if we have true targets for the same src
                 if ("mm_espgrad" in src) and (src in test_data):
                     tgt = _esp_to_grad_name(src)
-                    # shapes must align: esp: (B,Mmax,3), Q: (B,Mmax)
                     esp_pred = preds_np[src]
                     esp_true = test_data[src]
                     if esp_pred.ndim == 3 and esp_pred.shape[-1] == 3 \
                        and esp_true.shape == esp_pred.shape and Q.shape[0] == esp_pred.shape[0] \
                        and Q.shape[1] == esp_pred.shape[1]:
-                        # broadcast multiply per-atom, per-component
-                        q3 = Q[..., None]  # (B,Mmax,1)
+                        q3 = Q[..., None]
                         grad_pred = esp_pred * q3
                         grad_true = esp_true * q3
                         preds_np[tgt] = grad_pred
-                        # inject true field for uniform handling downstream
                         test_data[tgt] = grad_true
                         derived_pairs.append((src, tgt))
                     else:
@@ -333,27 +307,21 @@ def main():
     else:
         print("[warn] test_data lacks 'mm_Q'; cannot derive mm_grad_* from mm_espgrad_*")
 
-    # Expand evaluation set to include derived mm_grad_* keys
     eval_keys: List[str] = list(loss_keys)
     for _, newk in derived_pairs:
         if newk not in eval_keys:
             eval_keys.append(newk)
 
-    # ---- mask lookup with sensible fallback for MM fields ----
-    # Try io_meta patterns first; if nothing matches and key looks like MM per-atom,
-    # fallback to (mm_type > 0) when available.
+    # ---- mask lookup ----
     def maybe_mask_for(name: str) -> np.ndarray | None:
-        # exact mapping
         if name in masks_cfg and masks_cfg[name] in test_data:
             return test_data[masks_cfg[name]]
-        # wildcard pattern mapping
         for pat, mk in masks_cfg.items():
             if any(ch in pat for ch in "*?[") and fnmatch(name, pat):
                 return test_data.get(mk, None)
-        # fallback for MM atom-wise tensors
         if name.startswith("mm_") and "mm_type" in test_data:
             mt = test_data["mm_type"]
-            if mt.ndim == 2:  # (B, Mmax)
+            if mt.ndim == 2:
                 return (mt > 0.5).astype(np.bool_)
         return None
 
@@ -369,24 +337,18 @@ def main():
         pred = preds_np[k]
         true = test_data[k]
 
-        # Align shapes as in training
         try:
             pred, true = normalize_shapes_np(pred, true)
         except ValueError as e:
             print(f"[warn] {e}; skipping key '{k}'")
             continue
 
-        # Unit conversion (per-field)
         pred, units_lbl = convert_units(k, pred, args.units)
         true, _ = convert_units(k, true, args.units)
 
-        # Mask selection (with fallback for mm_* -> mm_type)
         mask = maybe_mask_for(k)
-
-        # Flatten per vector_mode
         pflat, tflat, mflat = flatten_vec(pred, true, mask, args.vector_mode)
 
-        # Metrics
         mae, rmse, r2 = masked_mae_rmse_r2(pflat, tflat, mflat)
         npts = int(len(pflat) if mflat is None else (mflat.astype(bool).sum()))
         tmin = float(np.min(tflat)) if tflat.size else float('nan')
@@ -399,7 +361,6 @@ def main():
             f"{tmin:.6e}", f"{tmax:.6e}", f"{pmin:.6e}", f"{pmax:.6e}"
         ])
 
-        # Save arrays (optional)
         if args.save_data_dir:
             out_csv = os.path.join(args.save_data_dir, f"{k}_true_pred.csv")
             with open(out_csv, "w", encoding="utf-8", newline="") as f:
@@ -414,7 +375,6 @@ def main():
                         if mm:
                             w.writerow([f"{a:.10e}", f"{b:.10e}"])
 
-        # Keep in combined NPZ too (already unit-converted & flattened)
         if mflat is None:
             combined_save[f"{k}_true"] = tflat
             combined_save[f"{k}_pred"] = pflat
@@ -423,13 +383,11 @@ def main():
             combined_save[f"{k}_true"] = tflat[m]
             combined_save[f"{k}_pred"] = pflat[m]
 
-        # Plots: density + scatter with metrics
         if pflat.size and tflat.size:
             n = min(len(pflat), max(0, int(args.max_points)))
             if n <= 0:
                 idx = slice(None)
             elif len(pflat) > n:
-                # deterministic-ish sampling without numpy RNG
                 idx = sorted(rng.sample(range(len(pflat)), n))
             else:
                 idx = slice(None)
@@ -467,7 +425,7 @@ def main():
                 plt.savefig(os.path.join(plots_dir, f"{k}_scatter.png"), dpi=180)
                 plt.close()
 
-    # --- Write metrics CSV (UTF-8 via csv.writer) ---
+    # --- Write metrics CSV ---
     out_csv_path = os.path.join(out_dir, "test_metrics.csv")
     with open(out_csv_path, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f)
@@ -534,7 +492,6 @@ def main():
     except Exception as e:
         model_stats["param_enum_error"] = f"{type(e).__name__}: {e}"
 
-    # File sizes
     def _file_size(path: str) -> int:
         try:
             return os.path.getsize(path)
@@ -548,17 +505,60 @@ def main():
     with open(os.path.join(out_dir, "model_stats.json"), "w", encoding="utf-8") as f:
         json.dump(model_stats, f, indent=2, ensure_ascii=False)
 
+    # ========== BRIDGE META (ONLY the 4 lines) ==========
+    # n_qm
+    n_qm = None
+    if "qm_coords" in test_data and test_data["qm_coords"].ndim >= 2:
+        n_qm = int(test_data["qm_coords"].shape[1])
+    elif "qm_Z" in test_data and test_data["qm_Z"].ndim >= 2:
+        n_qm = int(test_data["qm_Z"].shape[1])
+    else:
+        # fallback from atom_types if present
+        if "atom_types" in test_data and test_data["atom_types"].ndim >= 2:
+            n_qm = int(test_data["atom_types"].shape[1])
+    n_qm = int(n_qm or 0)
+
+    # max_mm
+    max_mm = 0
+    for key in ("mm_coords", "mm_Q", "mm_type"):
+        if key in test_data and test_data[key].ndim >= 2:
+            max_mm = int(test_data[key].shape[1])
+            break
+
+    # species_z_ordered & n_types
+    if species_cfg and isinstance(species_cfg, list) and len(species_cfg) > 0:
+        species_z = [int(z) for z in species_cfg]
+    else:
+        if "qm_Z" in test_data and test_data["qm_Z"].ndim >= 2:
+            first = np.asarray(test_data["qm_Z"][0]).reshape(-1)
+            species_z = sorted({int(z) for z in first.tolist()})
+        else:
+            species_z = []
+    n_types = int(len(species_z))
+
+    bridge_txt = os.path.join(out_dir, "bridge_meta.txt")
+    try:
+        with open(bridge_txt, "w", encoding="utf-8") as f:
+            # EXACTLY these four lines, nothing else
+            f.write(f"n_qm {n_qm}\n")
+            f.write(f"max_mm {max_mm}\n")
+            f.write(f"n_types {n_types}\n")
+            f.write("species_z_ordered " + " ".join(str(z) for z in species_z) + "\n")
+    except Exception as e:
+        print(f"[warn] failed to write bridge_meta.txt: {type(e).__name__}: {e}")
+    # =====================================================
+
     print(
         "Test evaluation complete.\n"
         f" - Plots: {plots_dir}\n"
         f" - Metrics CSV: {os.path.join(out_dir, 'test_metrics.csv')}\n"
         f" - Predictions NPZ: {os.path.join(out_dir, 'predictions_test.npz')}\n"
         f" - Model stats: {os.path.join(out_dir, 'model_stats.json')}\n"
+        f" - Bridge meta: {bridge_txt}\n"
         + (f" - Saved per-key CSVs: {args.save_data_dir}\n" if args.save_data_dir else "")
     )
 
 
 if __name__ == "__main__":
-    # Force UTF-8 on stdout/stderr in notoriously ASCII-default environments
     os.environ.setdefault("PYTHONIOENCODING", "utf-8")
     main()
