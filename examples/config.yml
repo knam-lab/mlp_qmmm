@@ -110,7 +110,6 @@ weighting:
     use_val: true
     activate_when_any_met: true   # <— only start TGW after ANY key meets threshold
     renorm: true
-    activate_when_any_met: true
 
     deactivate_when_all_met: true
     deactivate_scale: 1.0
