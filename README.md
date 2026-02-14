@@ -11,7 +11,7 @@ Clone the repository and install into your environment:
 
 ```bash
 #Conda Environment
-conda create -n  mlpqmmmenv python # ==3.13
+conda create -n  mlpqmmmenv python==3.13   #should be python3 <=3.13
 conda activate mlpqmmmenv
 #conda install conda-forge::mamba
 #mamba install -c conda-forge ipython numpy scipy matplotlib mdanalysis multiprocess tqdm pandas pyyaml
