@@ -3,6 +3,14 @@
 Long-range **MLP QM/MM framework** for machine learning potentials with explicit handling of QM atoms and embedded MM charges.  
 Implements descriptor + electrostatic feature networks, flexible training via YAML configs, and reproducible evaluation workflows.
 
+### References
+
+[1] Pan, X.; Yang, J.; Van, R.; Epifanovsky, E.; Ho, J.; Huang, J.; Pu, J.; Mei, Y.; Nam, K.; Shao, Y. Machine-Learning-Assisted Free Energy Simulation of Solution-Phase and Enzyme Reactions. J. Chem. Theory Comput. 2021, 17 (9), 5745–5758.
+
+[2] Arattu Thodika, A. R.; Pan, X.; Shao, Y.; Nam, K. Machine Learning Quantum Mechanical/Molecular Mechanical Potentials: Evaluating Transferability in Dihydrofolate Reductase-Catalyzed Reactions. J. Chem. Theory Comput. 2025, 21 (2), 817–832.
+
+[3] Arattu Thodika, A. R.; Panda, S. K.; Pan, X.; Shao, Y.; Nam, K. Accurate and Time-Efficient Condensed-Phase Free Energy Simulations with Reaction-Specific &Delta;-Machine Learning Potentials in CHARMM, *under review*
+
 ---
 
 ## 📦 Installation
