@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlp_qmmm"
+version = "1.0.0"
+description = "Long-range MLP QM/MM framework"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+  { name = "A", email = "a@gmail.com" },
+  { name = "X", email = "pl@p.net" },
+]
+requires-python = ">=3.9,<3.14"
+dependencies = [
+  "numpy>=1.23",
+  "pyyaml>=6.0",
+  "matplotlib>=3.7",
+  "pandas>=2.0",
+  "torch>=2.10",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+mpi = ["mpi4py>=3.1"]
+
+[project.scripts]
+qmmm-train = "mlp_qmmm.training:main"
+qmmm-test = "mlp_qmmm.testing:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mlp_qmmm*"]
