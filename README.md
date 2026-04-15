@@ -1,4 +1,4 @@
-# mlp_qmmm
+# mlp_qmmm 0.x
 
 Long-range **MLP QM/MM framework** for machine learning potentials with explicit handling of QM atoms and embedded MM charges.  
 Implements descriptor + electrostatic feature networks, flexible training via YAML configs, and reproducible evaluation workflows.
@@ -15,7 +15,7 @@ Implements descriptor + electrostatic feature networks, flexible training via YA
 
 ## 📦 Installation
 
-Clone the repository and install into your environment:
+Clone/Download the repository and install into your environment:
 
 ```bash
 #Conda Environment
@@ -33,7 +33,7 @@ pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu12
 pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
 # or try # pip install torch torchvision torchaudio
 
-cd <package_base_dir>
+cd <package_base_dir>    # has .toml file and src
 pip install -e .
 ```
 ---
