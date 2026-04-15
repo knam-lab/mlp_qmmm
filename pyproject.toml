@@ -8,10 +8,7 @@ version = "1.0.0"
 description = "Long-range MLP QM/MM framework"
 readme = "README.md"
 license = { file = "LICENSE" }
-authors = [
-  { name = "A", email = "a@gmail.com" },
-  { name = "X", email = "pl@p.net" },
-]
+
 requires-python = ">=3.9,<3.14"
 dependencies = [
   "numpy>=1.23",
