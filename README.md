@@ -1,6 +1,6 @@
 # mlp_qmmm 0.x
 
-Long-range **MLP QM/MM framework** for machine learning potentials with explicit handling of QM atoms and embedded MM charges.  
+Long-range **MLP QM/MM framework** for machine learning potentials handling QM atoms and embedded MM charges within a cut-off.  
 Implements descriptor + electrostatic feature networks, flexible training via YAML configs, and reproducible evaluation workflows.
 
 ### References
